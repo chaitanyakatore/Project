@@ -1,1 +1,1 @@
-export { userTable } from "./user.modal";
+export { userTable } from "./user.modal.js";
