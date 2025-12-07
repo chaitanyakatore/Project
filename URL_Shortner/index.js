@@ -1,11 +1,12 @@
 import express from "express";
 
+import userRouter from "./routes/user.route.js";
 const app = express();
 const PORT = process.env.PORT ?? 8000;
 
-app.get("/", (req, res) => {
-  return res.json({ status: "app is running " });
-});
+app.use(express.json());
+
+app.use("/user", userRouter);
 
 app.listen(8000, () => {
   console.log(`app is running on the port ${PORT}`);
