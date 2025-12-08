@@ -2,24 +2,24 @@ import { db } from "../db/index.js";
 import { userTable } from "../models/index.js";
 import { eq } from "drizzle-orm";
 
-export async function getUserByEmail(email){
-    const [existingUser] = await db
-    .select({ 
-        id: userTable.id,
-        firstname: userTable.firstname,
-        lastname: userTable.lastname,
-        email: userTable.email
-        
+export async function getUserByEmail(email) {
+  const [existingUser] = await db
+    .select({
+      id: userTable.id,
+      firstname: userTable.firstname,
+      lastname: userTable.lastname,
+      email: userTable.email,
+      salt: userTable.salt,
+      password: userTable.password,
     })
     .from(userTable)
     .where(eq(userTable.email, email));
 
-    return existingUser;
+  return existingUser;
 }
 
-
-export async function createUser(user){
-    const [newUser] = await db
+export async function createUser(user) {
+  const [newUser] = await db
     .insert(userTable)
     .values({
       firstname: user.firstname,
@@ -30,5 +30,5 @@ export async function createUser(user){
     })
     .returning({ id: userTable.id });
 
-    return newUser;
+  return newUser;
 }
