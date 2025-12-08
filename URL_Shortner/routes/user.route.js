@@ -1,19 +1,22 @@
 import express from "express";
-import { signupPostRequestBodySchema } from "../validation/request.validation.js";
+import {
+  signinRequestBodySchema,
+  signupPostRequestBodySchema,
+} from "../validation/request.validation.js";
 import generatedHashedPassword from "../utils/encryption.js";
-import {getUserByEmail, createUser} from "../services/user.service.js";
+import { getUserByEmail, createUser } from "../services/user.service.js";
+import { generateToken } from "../utils/token.js";
 
 const userRouter = express.Router();
 
-userRouter.post("/signup", async (req,res) => {
+//signup route to regrister the user
+userRouter.post("/signup", async (req, res) => {
   const validationResult = await signupPostRequestBodySchema.safeParseAsync(
     req.body
   );
 
   if (validationResult.error) {
-    return res
-      .status(400)
-      .json({ error: validationResult.error.format() });
+    return res.status(400).json({ error: validationResult.error.format() });
   }
 
   const { firstname, lastname, email, password } = validationResult.data;
@@ -34,5 +37,41 @@ userRouter.post("/signup", async (req,res) => {
 
   return res.status(201).json({ data: { userId: user.id } });
 });
+
+// login route for the token generation
+userRouter.post("/login", async (req, res) => {
+  const validationResult = await signinRequestBodySchema.safeParseAsync(
+    req.body
+  );
+
+  if (validationResult.error) {
+    return res.status(400).json({ error: validationResult.error.format() });
+  }
+
+  const { email, password } = validationResult.data;
+
+  const user = await getUserByEmail(email);
+
+  if (!user) {
+    return res
+      .status(404)
+      .json({ error: `User with ${email} does not exist` });
+  }
+
+  // Re-hash the password using the same salt from the DB
+  const { password: hashedPassword } = generatedHashedPassword(
+    password,
+    user.salt
+  );
+
+  if (user.password !== hashedPassword) {
+    return res.status(400).json({ error: "Invalid password" });
+  }
+
+  const token = generateToken({ id: user.id });
+
+  return res.json({ token });
+});
+
 
 export default userRouter;
