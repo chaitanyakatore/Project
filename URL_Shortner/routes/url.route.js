@@ -1,5 +1,6 @@
 import express from "express";
 import { shortenPostBodySchema } from "../validation/request.validation.js";
+import { e } from "../middleware/auth.middleware.js"
 
 import { db } from "../db/index.js";
 import { urlsTable } from "../models/index.js";
@@ -8,14 +9,6 @@ import { nanoid } from "nanoid";
 const urlRouter = express.Router();
 
 urlRouter.post("/shorten", async function (req, res) {
-  const userId = req.user?.id;
-
-  if (!userId) {
-    return res
-      .status(401)
-      .json({ error: "you must logged in to access the resource" });
-  }
-
   const validationResult = await shortenPostBodySchema.safeParseAsync(req.body);
 
   if (validationResult.error) {

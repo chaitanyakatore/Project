@@ -21,4 +21,11 @@ function authenticationMiddleware(req, res, next) {
   next();
 }
 
+function ensureAuthenticated(req, res, next) {
+  if (!req.user || !req.user.id) {
+    return res.status(404).json({ error: `User with ${email} does not exist` });
+  }
+  next();
+}
+
 export { authenticationMiddleware };
