@@ -1,0 +1,46 @@
+added this command to build the turborepo which is kind of monorepo with typescript integration
+This will create a web app (Next.js/React) and an api app (Express).
+
+npx create-turbo@latest underwriting-platform
+
+Go to packages/shared-types/src/case.ts (create the folder if it's not there).
+
+created the
+once you create the files install zod
+
+zod is typescript first validation librabry
+
+inside case.ts create the schema for the case using the zod
+
+once created export it
+
+then create teh docker-compose.yml file for the data-centers running locally
+
+docker-compose up -d
+bash: docker-compose: command not found
+
+once you added the compose-yaml now you need to up and install the apps on your local for that you can run
+
+docker compose up -d this command in latest - is gone
+
+once our docker containers are running then start with prisma setup
+
+once this thing is done create the api folder inside the apps and src inside that then initialize npm init -y inside it
+npm install prisma @prisma/client mongoose redis kafkajs zod cors dotenv
+
+run above command for the dependency
+Initialize Prisma (Postgres)
+
+In your apps/api folder:
+
+Run npx prisma init.
+
+Update the DATABASE_URL in your .env file: DATABASE_URL="postgresql://dev_user:dev_password@localhost:5432/underwriting_core?schema=public"
+
+B. Initialize Mongoose (MongoDB)
+
+Add this to your .env in apps/api: MONGO_URL="mongodb://localhost:27017/underwriting_medical"
+
+C. Install the Kafka Client
+
+We will use kafkajs for our event-driven logic: npm install kafkajs
