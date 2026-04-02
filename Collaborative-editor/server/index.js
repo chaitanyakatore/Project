@@ -2,76 +2,50 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
-const mongoose = require("mongoose");
-const Document = require("./Document"); // 1. Import your Mongoose model
 
 const app = express();
 app.use(cors());
 const server = http.createServer(app);
 
-// 2. Connect to MongoDB
-mongoose
-  .connect("mongodb://localhost:27017/collab-editor")
-  .then(() => console.log("🗄️ Connected to MongoDB"))
-  .catch((err) => console.error("MongoDB connection error:", err));
-
 const io = new Server(server, {
   cors: { origin: "http://localhost:5173", methods: ["GET", "POST"] },
 });
 
-// A helper function to fetch from DB, or create a blank one if it's new
-async function findOrCreateDocument(id) {
-  if (id == null) return;
-  const document = await Document.findById(id);
-  if (document) return document; // Return existing document
-  return await Document.create({ _id: id, data: "" }); // Create new empty document
-}
-
-// A standard REST route to get all documents for the homepage dashboard
-app.get("/api/documents", async (req, res) => {
-  try {
-    // Find all documents, sort by most recently updated, and only return the _id and updatedAt fields (we don't need the massive 'data' field just for the list)
-    const documents = await Document.find({}, "_id updatedAt").sort({
-      updatedAt: -1,
-    });
-    res.json(documents);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch documents" });
-  }
-});
+// 1. A temporary in-memory database to store our documents
+// (In production, this would be Redis or PostgreSQL)
+const documentStore = {};
 
 io.on("connection", (socket) => {
   console.log(`🟢 User connected: ${socket.id}`);
 
-  socket.on("get-document", async (documentId) => {
-    // 3. Put the user in the room
+  // 2. Listen for a user asking to load a specific document
+  socket.on("get-document", (documentId) => {
+    // Put the user in a private room for this specific document
     socket.join(documentId);
 
-    // 4. Hit the database (This is an async operation now!)
-    const document = await findOrCreateDocument(documentId);
+    // Fetch the document from our "database" (or create a blank one if it doesn't exist)
+    const data = documentStore[documentId] || "";
 
-    // 5. Send the DB data back to the client
-    socket.emit("load-document", document.data);
+    // Send the saved text ONLY to the user who just joined
+    socket.emit("load-document", data);
 
-    // Listen for text changes
+    // 3. Listen for changes, but ONLY broadcast to this specific room
     socket.on("send-changes", (delta) => {
       socket.broadcast.to(documentId).emit("receive-changes", delta);
     });
 
-    // Listen for cursor movements
     socket.on("send-cursor", (range) => {
       socket.broadcast.to(documentId).emit("receive-cursor", {
         id: socket.id,
         range: range,
       });
     });
-
-    // 6. Update MongoDB when the client triggers a save
-    socket.on("save-document", async (data) => {
-      await Document.findByIdAndUpdate(documentId, { data });
+    // 4. Listen for save requests to update our "database"
+    socket.on("save-document", (data) => {
+      documentStore[documentId] = data;
     });
   });
 });
 
-const PORT = 5001;
+const PORT = 5001; // Using your correct port!
 server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
