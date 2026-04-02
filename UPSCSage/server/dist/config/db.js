@@ -1,0 +1,22 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const pg_1 = require("pg");
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config();
+// Initialize the PostgreSQL connection pool
+// This avoids opening a new TCP connection on every request,
+// improving latency and supporting higher concurrency.
+const pool = new pg_1.Pool({
+    connectionString: process.env.DATABASE_URL,
+    // Add additional configurations if needed (max connections, idle timeouts, etc.)
+    // max: 20, // max number of clients in the pool
+    // idleTimeoutMillis: 30000 // how long a client is allowed to remain idle before being closed
+});
+pool.on('error', (err) => {
+    console.error('Unexpected error on idle client', err);
+    process.exit(-1);
+});
+exports.default = pool;
