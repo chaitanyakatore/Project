@@ -1,0 +1,312 @@
+<style>
+  #erd {
+    padding: 1rem 0;
+  }
+  #erd svg {
+    width: 100%;
+    height: auto;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin: 12px 0 4px;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+</style>
+<h2 class="sr-only">
+  ReSureAI database schema entity relationship diagram showing tables for auth,
+  submission, document, pricing, notification, audit and DLQ services
+</h2>
+<div class="legend">
+  <span
+    style="font-weight: 500; color: var(--color-text-primary); font-size: 12px"
+    >Services:</span
+  >
+  <span class="legend-item"
+    ><span class="dot" style="background: #534ab7"></span>Auth</span
+  >
+  <span class="legend-item"
+    ><span class="dot" style="background: #0f6e56"></span>Submission</span
+  >
+  <span class="legend-item"
+    ><span class="dot" style="background: #993c1d"></span>Document</span
+  >
+  <span class="legend-item"
+    ><span class="dot" style="background: #185fa5"></span>Pricing</span
+  >
+  <span class="legend-item"
+    ><span class="dot" style="background: #993556"></span>Notification</span
+  >
+  <span class="legend-item"
+    ><span class="dot" style="background: #3b6d11"></span>Audit / DLQ</span
+  >
+</div>
+<div id="erd"></div>
+<script type="module">
+  import mermaid from "https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs";
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  await document.fonts.ready;
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: "base",
+    fontFamily: '"Anthropic Sans", sans-serif',
+    themeVariables: {
+      darkMode: dark,
+      fontSize: "12px",
+      fontFamily: '"Anthropic Sans", sans-serif',
+      lineColor: dark ? "#9c9a92" : "#73726c",
+      textColor: dark ? "#c2c0b6" : "#3d3d3a",
+      primaryColor: dark ? "#3C3489" : "#EEEDFE",
+      primaryBorderColor: dark ? "#7F77DD" : "#534AB7",
+      primaryTextColor: dark ? "#CECBF6" : "#26215C",
+      secondaryColor: dark ? "#085041" : "#E1F5EE",
+      secondaryBorderColor: dark ? "#1D9E75" : "#0F6E56",
+      secondaryTextColor: dark ? "#9FE1CB" : "#04342C",
+      tertiaryColor: dark ? "#0C447C" : "#E6F1FB",
+      tertiaryBorderColor: dark ? "#378ADD" : "#185FA5",
+      tertiaryTextColor: dark ? "#B5D4F4" : "#042C53",
+    },
+  });
+
+  const diagram = `erDiagram
+  users {
+    uuid id PK
+    string email UK
+    string password_hash
+    enum role "broker|underwriter|admin"
+    string full_name
+    string phone
+    boolean is_active
+    timestamp last_login_at
+    timestamp created_at
+    timestamp updated_at
+  }
+
+  refresh_tokens {
+    uuid id PK
+    uuid user_id FK
+    string token_hash UK
+    timestamp expires_at
+    string ip_address
+    string user_agent
+    boolean is_revoked
+    timestamp created_at
+  }
+
+  submissions {
+    uuid id PK
+    uuid broker_id FK
+    uuid underwriter_id FK
+    string reference_number UK
+    string insured_name
+    string insured_country
+    enum line_of_business "property|casualty|marine|life"
+    enum status "draft|submitted|in_review|approved|rejected|pending_docs"
+    decimal sum_insured
+    string currency
+    date inception_date
+    date expiry_date
+    text notes
+    timestamp submitted_at
+    timestamp reviewed_at
+    timestamp created_at
+    timestamp updated_at
+  }
+
+  submission_history {
+    uuid id PK
+    uuid submission_id FK
+    uuid changed_by FK
+    enum from_status
+    enum to_status
+    text reason
+    jsonb metadata
+    timestamp created_at
+  }
+
+  documents {
+    uuid id PK
+    uuid submission_id FK
+    uuid uploaded_by FK
+    string original_filename
+    string s3_key UK
+    string s3_bucket
+    string content_type
+    bigint file_size_bytes
+    enum doc_type "policy|loss_run|financials|inspection|other"
+    enum processing_status "pending|extracting|extracted|failed"
+    string sqs_message_id
+    integer retry_count
+    timestamp processed_at
+    timestamp created_at
+  }
+
+  document_extractions {
+    uuid id PK
+    uuid document_id FK
+    string ai_model_used
+    jsonb raw_extraction
+    jsonb structured_data
+    decimal confidence_score
+    text extraction_notes
+    integer tokens_used
+    timestamp created_at
+  }
+
+  risk_assessments {
+    uuid id PK
+    uuid submission_id FK
+    uuid document_extraction_id FK
+    decimal risk_score
+    enum risk_tier "low|medium|high|declined"
+    jsonb risk_factors
+    jsonb ai_reasoning
+    string model_version
+    boolean is_overridden
+    uuid overridden_by FK
+    text override_reason
+    timestamp created_at
+  }
+
+  premium_quotes {
+    uuid id PK
+    uuid submission_id FK
+    uuid risk_assessment_id FK
+    decimal base_premium
+    decimal loading_factor
+    decimal discount_factor
+    decimal final_premium
+    string currency
+    decimal rate_on_line
+    jsonb pricing_breakdown
+    enum quote_status "draft|presented|accepted|rejected|expired"
+    date valid_until
+    timestamp created_at
+    timestamp updated_at
+  }
+
+  underwriter_decisions {
+    uuid id PK
+    uuid submission_id FK
+    uuid underwriter_id FK
+    uuid premium_quote_id FK
+    enum decision "approved|rejected|refer|request_docs"
+    text decision_notes
+    jsonb conditions
+    timestamp decided_at
+    timestamp created_at
+  }
+
+  notifications {
+    uuid id PK
+    uuid user_id FK
+    uuid submission_id FK
+    enum channel "email|sms|in_app"
+    enum event_type "submission_received|doc_uploaded|risk_scored|quote_ready|decision_made|doc_requested"
+    string subject
+    text body
+    enum delivery_status "queued|sent|delivered|failed"
+    string external_message_id
+    integer retry_count
+    timestamp sent_at
+    timestamp created_at
+  }
+
+  audit_logs {
+    uuid id PK
+    uuid user_id FK
+    string entity_type
+    uuid entity_id
+    string action
+    jsonb before_state
+    jsonb after_state
+    string ip_address
+    string user_agent
+    string service_name
+    timestamp created_at
+  }
+
+  dlq_events {
+    uuid id PK
+    string queue_name
+    string sqs_message_id UK
+    string event_type
+    jsonb payload
+    string error_message
+    string stack_trace
+    integer retry_count
+    enum resolution_status "unresolved|retrying|resolved|discarded"
+    uuid resolved_by FK
+    text resolution_notes
+    timestamp first_failed_at
+    timestamp last_attempted_at
+    timestamp resolved_at
+    timestamp created_at
+  }
+
+  users ||--o{ refresh_tokens : "has"
+  users ||--o{ submissions : "brokers"
+  users ||--o{ underwriter_decisions : "decides"
+  submissions ||--o{ submission_history : "tracks"
+  submissions ||--o{ documents : "contains"
+  submissions ||--o{ risk_assessments : "has"
+  submissions ||--o{ premium_quotes : "has"
+  submissions ||--o{ underwriter_decisions : "receives"
+  submissions ||--o{ notifications : "triggers"
+  documents ||--o{ document_extractions : "produces"
+  document_extractions ||--o| risk_assessments : "feeds"
+  risk_assessments ||--o{ premium_quotes : "informs"
+  premium_quotes ||--o{ underwriter_decisions : "referenced_in"
+  users ||--o{ notifications : "receives"
+  users ||--o{ audit_logs : "generates"
+`;
+
+  const { svg } = await mermaid.render("erd-svg", diagram);
+  document.getElementById("erd").innerHTML = svg;
+
+  document.querySelectorAll("#erd svg .node").forEach((node) => {
+    const firstPath = node.querySelector("path[d]");
+    if (!firstPath) return;
+    const d = firstPath.getAttribute("d");
+    const nums = d.match(/-?[\d.]+/g)?.map(Number);
+    if (!nums || nums.length < 8) return;
+    const xs = [nums[0], nums[2], nums[4], nums[6]];
+    const ys = [nums[1], nums[3], nums[5], nums[7]];
+    const x = Math.min(...xs),
+      y = Math.min(...ys);
+    const w = Math.max(...xs) - x,
+      h = Math.max(...ys) - y;
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute("x", x);
+    rect.setAttribute("y", y);
+    rect.setAttribute("width", w);
+    rect.setAttribute("height", h);
+    rect.setAttribute("rx", "8");
+    for (const a of ["fill", "stroke", "stroke-width", "class", "style"]) {
+      if (firstPath.hasAttribute(a))
+        rect.setAttribute(a, firstPath.getAttribute(a));
+    }
+    firstPath.replaceWith(rect);
+  });
+
+  document
+    .querySelectorAll(
+      "#erd svg .row-rect-odd path, #erd svg .row-rect-even path",
+    )
+    .forEach((p) => {
+      p.setAttribute("stroke", "none");
+    });
+</script>
