@@ -1,47 +1,75 @@
-import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
+import AuthService from '../services/AuthService.js';
 
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'secret', {
-    expiresIn: '30d',
+const setRefreshTokenCookie = (res, token) => {
+  res.cookie('refreshToken', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
   });
 };
 
 export const registerUser = async (req, res) => {
-  const { name, email, password } = req.body;
-
-  const userExists = await User.findOne({ email });
-  if (userExists) {
-    return res.status(400).json({ message: 'User already exists' });
-  }
-
-  const user = await User.create({ name, email, password });
-
-  if (user) {
+  try {
+    const { name, email, password, role } = req.body;
+    const result = await AuthService.registerUser({ name, email, password, role });
+    
+    setRefreshTokenCookie(res, result.refreshToken);
     res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      token: generateToken(user._id),
+      user: result.user,
+      accessToken: result.accessToken
     });
-  } else {
-    res.status(400).json({ message: 'Invalid user data' });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
   }
 };
 
 export const loginUser = async (req, res) => {
-  const { email, password } = req.body;
-
-  const user = await User.findOne({ email });
-
-  if (user && (await user.matchPassword(password))) {
+  try {
+    const { email, password } = req.body;
+    const result = await AuthService.loginUser({ email, password });
+    
+    setRefreshTokenCookie(res, result.refreshToken);
     res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      token: generateToken(user._id),
+      user: result.user,
+      accessToken: result.accessToken
     });
-  } else {
-    res.status(401).json({ message: 'Invalid email or password' });
+  } catch (error) {
+    res.status(401).json({ message: error.message });
+  }
+};
+
+const parseCookie = (cookieHeader, name) => {
+  if (!cookieHeader) return null;
+  const match = cookieHeader.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? match[2] : null;
+};
+
+export const refresh = async (req, res) => {
+  try {
+    const refreshToken = parseCookie(req.headers.cookie, 'refreshToken') || req.body?.refreshToken;
+    if (!refreshToken) {
+      return res.status(401).json({ message: 'Unauthorized: No refresh token provided' });
+    }
+
+    const result = await AuthService.refreshAccessToken(refreshToken);
+    setRefreshTokenCookie(res, result.refreshToken);
+    res.json({ accessToken: result.accessToken });
+  } catch (error) {
+    res.status(401).json({ message: error.message });
+  }
+};
+
+export const logout = async (req, res) => {
+  try {
+    const refreshToken = parseCookie(req.headers.cookie, 'refreshToken') || req.body?.refreshToken;
+    if (refreshToken) {
+      await AuthService.logoutUser(refreshToken);
+    }
+    
+    res.clearCookie('refreshToken');
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };

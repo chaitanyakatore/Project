@@ -1,121 +1,200 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
+import Sidebar from '../components/layout/Sidebar';
 import api from '../services/api';
-import { LogOut, Plus, Folder, Moon, Sun } from 'lucide-react';
+import { Plus, Folder } from 'lucide-react';
 
 const Dashboard = () => {
-  const { user, logout } = useAuth();
-  const { isDarkMode, toggleTheme } = useTheme();
   const [projects, setProjects] = useState([]);
+  const [activeWorkspace, setActiveWorkspace] = useState('Kanban'); // 'Kanban' or 'Scrum'
   const [newProjectTitle, setNewProjectTitle] = useState('');
+  const [newProjectDescription, setNewProjectDescription] = useState('');
+  const [newProjectType, setNewProjectType] = useState('Kanban');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const navigate = useNavigate();
 
   useEffect(() => {
     fetchProjects();
   }, []);
 
   const fetchProjects = async () => {
-    const { data } = await api.get('/projects');
-    setProjects(data);
+    try {
+      const { data } = await api.get('/projects');
+      setProjects(data);
+    } catch (err) {
+      console.error('Failed to load projects', err);
+    }
   };
 
   const handleCreateProject = async (e) => {
     e.preventDefault();
     if (!newProjectTitle) return;
-    await api.post('/projects', { title: newProjectTitle, description: '' });
-    setNewProjectTitle('');
-    setIsModalOpen(false);
-    fetchProjects();
+    try {
+      await api.post('/projects', { 
+        title: newProjectTitle, 
+        description: newProjectDescription, 
+        projectType: newProjectType 
+      });
+      setNewProjectTitle('');
+      setNewProjectDescription('');
+      setIsModalOpen(false);
+      fetchProjects();
+    } catch (err) {
+      console.error('Failed to create project', err);
+    }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const openCreateModal = () => {
+    setNewProjectType(activeWorkspace);
+    setIsModalOpen(true);
   };
+
+  // Filter projects depending on selected workspace selection
+  const filteredProjects = projects.filter((project) => {
+    const type = project.projectType || 'Kanban';
+    return type === activeWorkspace;
+  });
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <nav className="bg-white dark:bg-slate-800 shadow-sm border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex justify-between items-center transition-colors">
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-          <Folder className="text-primary" /> Kanban Boards
-        </h1>
-        <div className="flex items-center gap-4">
-          <button onClick={toggleTheme} className="text-slate-500 hover:text-primary dark:text-slate-400 transition">
-            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-          </button>
-          <span className="text-slate-600 dark:text-slate-300 font-medium hidden sm:inline">Hello, {user?.name}</span>
-          <button onClick={handleLogout} className="text-slate-500 dark:text-slate-400 hover:text-danger dark:hover:text-danger transition flex items-center gap-1">
-            <LogOut size={18} /> <span className="hidden sm:inline">Logout</span>
-          </button>
-        </div>
-      </nav>
+    <div className="flex h-screen bg-slate-50 overflow-hidden">
+      {/* Workspace Switcher Sidebar */}
+      <Sidebar 
+        activeWorkspace={activeWorkspace} 
+        onWorkspaceChange={setActiveWorkspace} 
+      />
 
-      <main className="flex-1 p-8 max-w-6xl mx-auto w-full">
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Your Projects</h2>
+      {/* Main Workspace Body */}
+      <div className="flex-1 flex flex-col overflow-y-auto">
+        {/* Header bar */}
+        <header className="bg-white shadow-sm border-b border-slate-200 px-8 py-5 flex justify-between items-center flex-shrink-0">
+          <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2 uppercase tracking-wide">
+            <Folder className={activeWorkspace === 'Scrum' ? 'text-purple-600' : 'text-blue-600'} />
+            {activeWorkspace === 'Scrum' ? 'Agile Scrum Workspace' : 'Kanban Workspace'}
+          </h1>
           <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-primary text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2 hover:bg-blue-600 shadow-md transition"
+            onClick={openCreateModal}
+            className={`text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 shadow-md transition text-sm ${
+              activeWorkspace === 'Scrum' 
+                ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/10' 
+                : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/10'
+            }`}
           >
-            <Plus size={20} /> New Project
+            <Plus size={16} /> New Project
           </button>
-        </div>
+        </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project) => (
-            <Link
-              key={project._id}
-              to={`/project/${project._id}`}
-              className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-primary dark:hover:border-primary transition group block"
-            >
-              <h3 className="text-xl font-semibold text-slate-800 dark:text-slate-100 mb-2 group-hover:text-primary transition">
-                {project.title}
-              </h3>
-              <p className="text-slate-500 dark:text-slate-400 text-sm line-clamp-2">
-                {project.description || 'No description provided.'}
-              </p>
-              <div className="mt-4 text-xs text-slate-400 dark:text-slate-500">
-                Created {new Date(project.createdAt).toLocaleDateString()}
+        {/* Projects Viewport */}
+        <main className="flex-1 p-8 max-w-6xl w-full mx-auto">
+          <div className="mb-6 flex justify-between items-center">
+            <h2 className="text-lg font-bold text-slate-500 uppercase tracking-wider">
+              {activeWorkspace === 'Scrum' ? 'Agile Scrum Boards' : 'Kanban Boards'}
+            </h2>
+            <span className="text-xs text-slate-400 font-bold bg-slate-200/55 px-2.5 py-1 rounded-full">
+              {filteredProjects.length} Projects
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredProjects.map((project) => (
+              <Link
+                key={project._id}
+                to={`/project/${project._id}`}
+                className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md hover:border-slate-300 transition group flex flex-col min-h-[160px]"
+              >
+                <h3 className="text-xl font-bold text-slate-800 mb-2 group-hover:text-primary transition">
+                  {project.title}
+                </h3>
+                <p className="text-slate-500 text-sm line-clamp-2 mb-4 flex-1">
+                  {project.description || 'No description provided.'}
+                </p>
+                <div className="flex justify-between items-center border-t border-slate-100 pt-3">
+                  <span className="text-xs text-slate-400">
+                    Created {new Date(project.createdAt).toLocaleDateString()}
+                  </span>
+                  <span className={`text-[10px] uppercase font-extrabold px-2.5 py-1 rounded-full ${
+                    project.projectType === 'Scrum' 
+                      ? 'bg-purple-100 text-purple-700 border border-purple-200' 
+                      : 'bg-blue-100 text-blue-700 border border-blue-200'
+                  }`}>
+                    {project.projectType || 'Kanban'}
+                  </span>
+                </div>
+              </Link>
+            ))}
+            
+            {filteredProjects.length === 0 && (
+              <div className="col-span-full bg-white border border-slate-200 rounded-2xl py-16 text-center text-slate-500 shadow-sm">
+                <Folder size={48} className="mx-auto text-slate-300 mb-3" />
+                <h3 className="text-lg font-bold text-slate-700 mb-1">No Projects Found</h3>
+                <p className="text-sm text-slate-400 mb-6">
+                  You don't have any projects in this workspace yet.
+                </p>
+                <button
+                  onClick={openCreateModal}
+                  className={`text-white px-4 py-2 rounded-xl font-bold text-sm transition shadow-sm ${
+                    activeWorkspace === 'Scrum' ? 'bg-purple-600 hover:bg-purple-750' : 'bg-blue-600 hover:bg-blue-750'
+                  }`}
+                >
+                  Create one now
+                </button>
               </div>
-            </Link>
-          ))}
-          {projects.length === 0 && (
-            <div className="col-span-full text-center py-12 text-slate-500">
-              No projects found. Create one to get started!
-            </div>
-          )}
-        </div>
-      </main>
+            )}
+          </div>
+        </main>
+      </div>
 
+      {/* Create Project Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-xl">
-            <h3 className="text-2xl font-bold mb-4">Create Project</h3>
+          <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl border border-slate-100">
+            <h3 className="text-2xl font-bold text-slate-800 mb-4">Create Project</h3>
             <form onSubmit={handleCreateProject}>
-              <input
-                type="text"
-                placeholder="Project Title"
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-primary focus:border-primary mb-4"
-                value={newProjectTitle}
-                onChange={(e) => setNewProjectTitle(e.target.value)}
-                required
-              />
+              <div className="mb-4">
+                <label className="block text-sm font-bold text-slate-600 mb-1">Project Title *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Sprint Tracker"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-transparent text-slate-800 text-sm font-semibold"
+                  value={newProjectTitle}
+                  onChange={(e) => setNewProjectTitle(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-bold text-slate-600 mb-1">Description</label>
+                <textarea
+                  placeholder="Optional details..."
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-transparent text-slate-800 text-sm font-semibold"
+                  value={newProjectDescription}
+                  onChange={(e) => setNewProjectDescription(e.target.value)}
+                  rows={3}
+                />
+              </div>
+              <div className="mb-6">
+                <label className="block text-sm font-bold text-slate-600 mb-1">Project Workspace Type</label>
+                <select
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-slate-800 text-sm font-semibold"
+                  value={newProjectType}
+                  onChange={(e) => setNewProjectType(e.target.value)}
+                >
+                  <option value="Kanban">Kanban Workspace (Simple Columns)</option>
+                  <option value="Scrum">Agile Scrum Workspace (Backlog & Sprints)</option>
+                </select>
+              </div>
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                  className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-xl font-bold text-sm transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600 transition shadow-sm"
+                  className={`text-white px-4 py-2 rounded-xl font-bold text-sm transition shadow-sm ${
+                    newProjectType === 'Scrum' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
                 >
-                  Create
+                  Create Project
                 </button>
               </div>
             </form>

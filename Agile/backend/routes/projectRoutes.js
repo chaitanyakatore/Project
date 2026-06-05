@@ -1,5 +1,5 @@
 import express from 'express';
-import { getProjects, createProject, getProjectById, deleteProject, addMember } from '../controllers/projectController.js';
+import { getProjects, createProject, getProjectById, deleteProject, addMember, getProjectActivities } from '../controllers/projectController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -14,5 +14,8 @@ router.route('/:id')
 
 router.route('/:id/members')
   .post(protect, addMember);
+
+router.route('/:id/activities')
+  .get(protect, getProjectActivities);
 
 export default router;

@@ -1,47 +1,46 @@
-import Sprint from '../models/Sprint.js';
+import SprintService from '../services/SprintService.js';
 
 export const getSprintsByProject = async (req, res) => {
-  const sprints = await Sprint.find({ project: req.params.projectId }).sort({ createdAt: -1 });
-  res.json(sprints);
+  try {
+    const sprints = await SprintService.getSprintsByProject(req.params.projectId);
+    res.json(sprints);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 export const createSprint = async (req, res) => {
-  const { name, goal, startDate, endDate } = req.body;
-  const sprint = new Sprint({
-    name,
-    goal,
-    startDate,
-    endDate,
-    project: req.params.projectId
-  });
-  const createdSprint = await sprint.save();
-  res.status(201).json(createdSprint);
+  try {
+    const sprint = await SprintService.createSprint(req.params.projectId, req.body);
+    res.status(201).json(sprint);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
 };
 
 export const updateSprint = async (req, res) => {
-  const { name, goal, startDate, endDate, status } = req.body;
-  const sprint = await Sprint.findById(req.params.id);
+  try {
+    const sprint = await SprintService.updateSprint(req.params.id, req.body);
+    res.json(sprint);
+  } catch (error) {
+    res.status(404).json({ message: error.message });
+  }
+};
 
-  if (sprint) {
-    sprint.name = name || sprint.name;
-    sprint.goal = goal || sprint.goal;
-    sprint.startDate = startDate || sprint.startDate;
-    sprint.endDate = endDate || sprint.endDate;
-    sprint.status = status || sprint.status;
-
-    const updatedSprint = await sprint.save();
-    res.json(updatedSprint);
-  } else {
-    res.status(404).json({ message: 'Sprint not found' });
+export const getSprintMetrics = async (req, res) => {
+  try {
+    const metrics = await SprintService.getSprintMetrics(req.params.id);
+    res.json(metrics);
+  } catch (error) {
+    res.status(404).json({ message: error.message });
   }
 };
 
 export const deleteSprint = async (req, res) => {
-  const sprint = await Sprint.findById(req.params.id);
-  if (sprint) {
-    await sprint.deleteOne();
-    res.json({ message: 'Sprint removed' });
-  } else {
-    res.status(404).json({ message: 'Sprint not found' });
+  try {
+    const result = await SprintService.deleteSprint(req.params.id);
+    res.json(result);
+  } catch (error) {
+    res.status(404).json({ message: error.message });
   }
 };

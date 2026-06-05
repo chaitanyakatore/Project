@@ -1,28 +1,33 @@
-import Comment from '../models/Comment.js';
+import CommentService from '../services/CommentService.js';
 
 export const getCommentsByTask = async (req, res) => {
-  const comments = await Comment.find({ task: req.params.taskId }).populate('author', 'name email').sort({ createdAt: 1 });
-  res.json(comments);
+  try {
+    const comments = await CommentService.getCommentsByTask(req.params.taskId);
+    res.json(comments);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 export const createComment = async (req, res) => {
-  const { text } = req.body;
-  const comment = new Comment({
-    text,
-    task: req.params.taskId,
-    author: req.user._id
-  });
-  const createdComment = await comment.save();
-  const populatedComment = await createdComment.populate('author', 'name email');
-  res.status(201).json(populatedComment);
+  try {
+    const { text } = req.body;
+    const comment = await CommentService.createComment(
+      req.params.taskId,
+      text,
+      req.user._id
+    );
+    res.status(201).json(comment);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
 };
 
 export const deleteComment = async (req, res) => {
-  const comment = await Comment.findById(req.params.id);
-  if (comment && comment.author.toString() === req.user._id.toString()) {
-    await comment.deleteOne();
-    res.json({ message: 'Comment removed' });
-  } else {
-    res.status(404).json({ message: 'Comment not found or unauthorized' });
+  try {
+    const result = await CommentService.deleteComment(req.params.id, req.user._id);
+    res.json(result);
+  } catch (error) {
+    res.status(404).json({ message: error.message });
   }
 };

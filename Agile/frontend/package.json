@@ -14,11 +14,13 @@
   "description": "",
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
+    "@reduxjs/toolkit": "^2.12.0",
     "axios": "^1.16.1",
     "lucide-react": "^1.16.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-quill": "^2.0.0",
+    "react-redux": "^9.3.0",
     "react-router-dom": "^7.15.1"
   },
   "devDependencies": {

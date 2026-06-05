@@ -1,60 +1,61 @@
-import Project from '../models/Project.js';
+import ProjectService from '../services/ProjectService.js';
 
 export const getProjects = async (req, res) => {
-  const projects = await Project.find({ $or: [{ owner: req.user._id }, { members: req.user._id }] })
-    .populate('owner', 'name email')
-    .populate('members', 'name email');
-  res.json(projects);
+  try {
+    const projects = await ProjectService.getProjectsForUser(req.user._id);
+    res.json(projects);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 export const getProjectById = async (req, res) => {
-  const project = await Project.findById(req.params.id)
-    .populate('owner', 'name email')
-    .populate('members', 'name email');
-  if (project && (project.owner._id.toString() === req.user._id.toString() || project.members.some(m => m._id.toString() === req.user._id.toString()))) {
+  try {
+    const project = await ProjectService.getProjectById(req.params.id, req.user._id);
     res.json(project);
-  } else {
-    res.status(404).json({ message: 'Project not found' });
+  } catch (error) {
+    res.status(404).json({ message: error.message });
   }
 };
 
 export const createProject = async (req, res) => {
-  const { title, description } = req.body;
-  const project = new Project({
-    title,
-    description,
-    owner: req.user._id,
-  });
-  const createdProject = await project.save();
-  res.status(201).json(createdProject);
-};
-
-export const deleteProject = async (req, res) => {
-  const project = await Project.findById(req.params.id);
-  if (project && project.owner.toString() === req.user._id.toString()) {
-    await project.deleteOne();
-    res.json({ message: 'Project removed' });
-  } else {
-    res.status(404).json({ message: 'Project not found or unauthorized' });
+  try {
+    const { title, description, projectType } = req.body;
+    const project = await ProjectService.createProject(
+      { title, description, projectType },
+      req.user._id
+    );
+    res.status(201).json(project);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
   }
 };
 
-import User from '../models/User.js';
-export const addMember = async (req, res) => {
-  const { email } = req.body;
-  const project = await Project.findById(req.params.id);
+export const deleteProject = async (req, res) => {
+  try {
+    const result = await ProjectService.deleteProject(req.params.id, req.user._id);
+    res.json(result);
+  } catch (error) {
+    res.status(404).json({ message: error.message });
+  }
+};
 
-  if (project && project.owner.toString() === req.user._id.toString()) {
-    const userToAdd = await User.findOne({ email });
-    if (!userToAdd) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    if (!project.members.includes(userToAdd._id)) {
-      project.members.push(userToAdd._id);
-      await project.save();
-    }
+export const addMember = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const project = await ProjectService.addMemberToProject(req.params.id, email, req.user._id);
     res.json(project);
-  } else {
-    res.status(404).json({ message: 'Project not found or unauthorized' });
+  } catch (error) {
+    res.status(404).json({ message: error.message });
+  }
+};
+
+import ActivityLogRepository from '../repositories/ActivityLogRepository.js';
+export const getProjectActivities = async (req, res) => {
+  try {
+    const activities = await ActivityLogRepository.findByProject(req.params.id);
+    res.json(activities);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
